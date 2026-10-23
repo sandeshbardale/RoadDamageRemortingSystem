@@ -44,14 +44,38 @@ app.use('/uploads', (req, res, next) => {
 }));
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
-);
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://road-damage-system.vercel.app',
+  ...(process.env.CLIENT_URL
+    ? process.env.CLIENT_URL.split(',').map((u) => u.trim().replace(/\/$/, ''))
+    : []),
+];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser requests (e.g. mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    const cleanOrigin = origin.replace(/\/$/, '');
+    if (
+      allowedOrigins.includes(cleanOrigin) ||
+      cleanOrigin.endsWith('.vercel.app') ||
+      process.env.NODE_ENV !== 'production'
+    ) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // ─── Body parsers ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
@@ -68,12 +92,14 @@ const globalLimiter = rateLimit({
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS',
   message: { success: false, message: 'Too many requests. Please try again later.' },
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
+  skip: (req) => req.method === 'OPTIONS',
   message: { success: false, message: 'Too many authentication attempts. Please try again in 15 minutes.' },
 });
 
