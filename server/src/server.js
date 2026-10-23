@@ -81,6 +81,16 @@ app.use('/api', globalLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
+// ─── Root route ─────────────────────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Road Damage Reporting API is online and running!',
+    health: '/api/health',
+    version: '1.0.0',
+  });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({
