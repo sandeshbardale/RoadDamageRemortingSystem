@@ -72,15 +72,24 @@ export default function ReportComplaint() {
     setForm(f => ({ ...f, image:file, imagePreview:URL.createObjectURL(file), imageSource:source }))
     setAiResult({ pending:true }) // show "AI will analyse on submit"
 
-    if (source === 'camera') {
-      setCaptureLoading(true)
-      try {
-        const pos  = await getCurrentPosition()
+    setCaptureLoading(true)
+    getCurrentPosition()
+      .then(async (pos) => {
         const addr = await reverseGeocode(pos.latitude, pos.longitude)
-        setLocation({ latitude:pos.latitude, longitude:pos.longitude, address:addr })
-      } catch {}
-      finally { setCaptureLoading(false) }
-    }
+        setLocation({ latitude: pos.latitude, longitude: pos.longitude, address: addr })
+      })
+      .catch(() => {})
+      .finally(() => setCaptureLoading(false))
+  }, [])
+
+  // Proactively fetch live location on component mount so it is ready immediately
+  useEffect(() => {
+    getCurrentPosition()
+      .then(async (pos) => {
+        const addr = await reverseGeocode(pos.latitude, pos.longitude)
+        setLocation((prev) => prev || { latitude: pos.latitude, longitude: pos.longitude, address: addr })
+      })
+      .catch(() => {})
   }, [])
 
   const handleCameraCapture = useCallback(async (file, previewUrl) => {

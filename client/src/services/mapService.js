@@ -7,7 +7,6 @@ export const reverseGeocode = async (latitude, longitude) => {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'RoadDamageReporting/1.0',
         'Accept-Language': 'en',
       },
     })
@@ -23,46 +22,99 @@ export const reverseGeocode = async (latitude, longitude) => {
       postcode: addr.postcode || '',
     }
   } catch (err) {
-    console.error('Reverse geocode failed:', err.message)
+    console.warn('Reverse geocode failed, using coordinates fallback:', err.message)
     return {
-      formatted: `${latitude}, ${longitude}`,
-      road: '', area: '', city: '', state: '', postcode: '',
+      formatted: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+      road: '',
+      area: '',
+      city: '',
+      state: '',
+      postcode: '',
     }
   }
 }
 
 /**
- * Get user's GPS position using Browser Geolocation API
+ * Fallback to IP geolocation when browser GPS is denied or unavailable
+ */
+const getIpLocation = async () => {
+  try {
+    const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(5000) })
+    if (!res.ok) throw new Error('IP geo failed')
+    const data = await res.json()
+    if (data.latitude && data.longitude) {
+      return {
+        latitude: parseFloat(data.latitude),
+        longitude: parseFloat(data.longitude),
+        accuracy: 1000,
+        isIpFallback: true,
+      }
+    }
+  } catch (e) {
+    // Try secondary IP provider
+    try {
+      const res2 = await fetch('https://ipwho.is/', { signal: AbortSignal.timeout(5000) })
+      const data2 = await res2.json()
+      if (data2.success && data2.latitude && data2.longitude) {
+        return {
+          latitude: parseFloat(data2.latitude),
+          longitude: parseFloat(data2.longitude),
+          accuracy: 1000,
+          isIpFallback: true,
+        }
+      }
+    } catch {}
+  }
+  return null
+}
+
+/**
+ * Get user's GPS position using Browser Geolocation API with robust fallbacks
  */
 export const getCurrentPosition = () => {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      return reject(new Error('Geolocation is not supported by your browser.'))
+      getIpLocation().then((ipLoc) => {
+        if (ipLoc) return resolve(ipLoc)
+        reject(new Error('Geolocation is not supported by your browser.'))
+      })
+      return
     }
+
+    // Try High Accuracy first (GPS)
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
-      }),
+      (pos) =>
+        resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }),
       (err) => {
-        let message
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            message = 'Location permission was denied. Please enable location access or enter the location manually.'
-            break
-          case err.POSITION_UNAVAILABLE:
-            message = 'Location information is unavailable. Please enter the location manually.'
-            break
-          case err.TIMEOUT:
-            message = 'Location request timed out. Please try again or enter the location manually.'
-            break
-          default:
-            message = 'Unable to determine your location. Please enter it manually.'
-        }
-        reject(new Error(message))
+        // High accuracy failed or timed out — try Low Accuracy (Wi-Fi/Cell)
+        navigator.geolocation.getCurrentPosition(
+          (pos) =>
+            resolve({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracy: pos.coords.accuracy,
+            }),
+          async () => {
+            // Browser GPS completely failed/denied — try IP geolocation
+            const ipLoc = await getIpLocation()
+            if (ipLoc) return resolve(ipLoc)
+
+            let message = 'Unable to determine your location. Please select it on the map.'
+            if (err.code === err.PERMISSION_DENIED) {
+              message = 'Location permission was denied. Please allow location in your browser or click on the map.'
+            } else if (err.code === err.TIMEOUT) {
+              message = 'Location request timed out. Please click on the map to set your location.'
+            }
+            reject(new Error(message))
+          },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+        )
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 }
     )
   })
 }

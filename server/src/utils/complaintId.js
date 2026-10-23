@@ -1,4 +1,4 @@
-const Complaint = require('../models/Complaint');
+const { prisma } = require('../config/prisma');
 
 /**
  * Generate a unique sequential complaint ID
@@ -9,17 +9,23 @@ const generateComplaintId = async () => {
   const prefix = `RDR-${year}-`;
 
   // Find the last complaint with this year prefix
-  const lastComplaint = await Complaint.findOne(
-    { complaintId: { $regex: `^${prefix}` } },
-    { complaintId: 1 },
-    { sort: { complaintId: -1 } }
-  );
+  const lastComplaint = await prisma.complaint.findFirst({
+    where: {
+      complaintId: { startsWith: prefix },
+    },
+    orderBy: {
+      complaintId: 'desc',
+    },
+    select: { complaintId: true },
+  });
 
   let nextNum = 1;
-  if (lastComplaint) {
+  if (lastComplaint && lastComplaint.complaintId) {
     const parts = lastComplaint.complaintId.split('-');
     const lastNum = parseInt(parts[2], 10);
-    nextNum = lastNum + 1;
+    if (!isNaN(lastNum)) {
+      nextNum = lastNum + 1;
+    }
   }
 
   return `${prefix}${String(nextNum).padStart(6, '0')}`;
