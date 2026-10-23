@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from 'react-leaflet'
 import L from 'leaflet'
-import { formatDate } from '../../utils/helpers'
-import { CATEGORY_COLORS, STATUS_LABELS, CATEGORY_LABELS } from '../../utils/helpers'
+import { CATEGORY_COLORS, STATUS_LABELS, CATEGORY_LABELS, resolveImageUrl } from '../../utils/helpers'
 import LoadingSpinner from '../ui/LoadingSpinner'
 
 // Fix Leaflet icons
@@ -57,7 +56,7 @@ export default function ComplaintMap({ complaints = [], loading = false, height 
                   <p><span className="text-gray-500">Reported:</span> {formatDate(c.createdAt)}</p>
                   {showImage && c.image?.url && (
                     <img
-                      src={c.image.url}
+                      src={resolveImageUrl(c.image.url)}
                       alt="Damage"
                       className="w-full rounded mt-2 object-cover"
                       style={{ maxHeight: 120 }}

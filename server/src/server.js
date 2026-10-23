@@ -31,12 +31,18 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,    // allow embedded resources
 }));
 
+const fs = require('fs');
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // ─── Serve locally-stored images ─────────────────────────────────────────────
 app.use('/uploads', (req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.setHeader('Access-Control-Allow-Origin', '*');
   next();
-}, express.static(path.join(__dirname, '../uploads'), {
+}, express.static(uploadsDir, {
   setHeaders: (res) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Cache-Control', 'public, max-age=86400');

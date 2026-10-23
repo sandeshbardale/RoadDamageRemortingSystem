@@ -59,15 +59,18 @@ export const getErrorMessage = (err) => {
 
 /**
  * Resolve an image URL to something the browser can load.
- * - /uploads/... → served via Vite proxy → http://localhost:5000/uploads/...
- * - http://... → already absolute, use as-is
- * - empty/null → null
+ * In development: /uploads/... is proxied by Vite to localhost:5000.
+ * In production: /uploads/... points to backend server on Render.
  */
 export const resolveImageUrl = (url) => {
   if (!url) return null
-  // Already absolute (Cloudinary or external)
-  if (url.startsWith('http://') || url.startsWith('https://')) return url
-  // Local uploads path — use as relative URL so Vite proxy handles it
-  if (url.startsWith('/uploads/')) return url
-  return url
+  // Already absolute (Cloudinary, external, or data URL)
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url
+
+  // Resolve base backend URL from environment
+  const apiUrl = import.meta.env.VITE_API_URL || ''
+  const backendBase = apiUrl.replace(/\/api\/?$/, '')
+
+  const cleanPath = url.startsWith('/') ? url : `/${url}`
+  return backendBase ? `${backendBase}${cleanPath}` : cleanPath
 }
