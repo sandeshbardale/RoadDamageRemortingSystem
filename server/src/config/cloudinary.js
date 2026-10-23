@@ -1,19 +1,24 @@
 const cloudinary = require('cloudinary').v2;
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
   secure: true,
 });
 
 const isCloudinaryReady = () =>
-  process.env.CLOUDINARY_CLOUD_NAME &&
-  process.env.CLOUDINARY_CLOUD_NAME !== 'your_cloudinary_cloud_name' &&
-  process.env.CLOUDINARY_API_KEY    !== 'your_cloudinary_api_key';
+  Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_CLOUD_NAME !== 'your_cloudinary_cloud_name' &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_KEY !== 'your_cloudinary_api_key' &&
+    process.env.CLOUDINARY_API_SECRET &&
+    process.env.CLOUDINARY_API_SECRET !== 'your_cloudinary_api_secret'
+  );
 
 // ─── Local disk upload (fallback when Cloudinary not configured) ──────────────
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
@@ -25,7 +30,7 @@ const saveLocally = (buffer, mimeType) => {
 
   try {
     if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-    const ext      = mimeType === 'image/png' ? '.png' : mimeType === 'image/webp' ? '.webp' : '.jpg';
+    const ext = mimeType === 'image/png' ? '.png' : mimeType === 'image/webp' ? '.webp' : '.jpg';
     const filename = `${uuidv4()}${ext}`;
     const filepath = path.join(UPLOADS_DIR, filename);
     fs.writeFileSync(filepath, buffer);
@@ -34,9 +39,9 @@ const saveLocally = (buffer, mimeType) => {
   }
 
   return {
-    url:      dataUrl,
+    url: dataUrl,
     publicId: 'local-data-image',
-    isLocal:  true,
+    isLocal: true,
   };
 };
 
