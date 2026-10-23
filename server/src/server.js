@@ -7,6 +7,7 @@ const morgan  = require('morgan');
 const path    = require('path');
 const rateLimit = require('express-rate-limit');
 
+const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const { errorHandler } = require('./middleware/errorHandler');
 const { error } = require('./utils/apiResponse');
@@ -109,22 +110,47 @@ app.use('/api/auth/register', authLimiter);
 
 // ─── Root route ─────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
+  const dbStates = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  const dbStatus = dbStates[mongoose.connection.readyState] || 'unknown';
+
   res.json({
     success: true,
     message: 'Road Damage Reporting API is online and running!',
     health: '/api/health',
     version: '1.0.0',
+    database: dbStatus,
   });
 });
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
+  const dbStates = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  const dbStatus = dbStates[mongoose.connection.readyState] || 'unknown';
+
   res.json({
     success: true,
     message: 'Road Damage Reporting API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
+    database: {
+      status: dbStatus,
+      connected: mongoose.connection.readyState === 1,
+    },
   });
+});
+
+// ─── DB Readiness Middleware for API endpoints ───────────────────────────────
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health' || req.method === 'OPTIONS') return next();
+  if (mongoose.connection.readyState !== 1) {
+    return error(
+      res,
+      'Database is not connected. In MongoDB Atlas, go to "Network Access" and add "0.0.0.0/0" (Allow Access from Anywhere). Also verify MONGODB_URI in Render environment.',
+      503,
+      'DATABASE_NOT_READY'
+    );
+  }
+  next();
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────

@@ -1,13 +1,20 @@
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
+  if (!process.env.MONGODB_URI) {
+    console.error('❌ MONGODB_URI is not set in environment variables!');
+    return;
+  }
+
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+    });
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error(`❌ MongoDB connection error: ${error.message}`);
-    console.error(`   Check MONGODB_URI in server/.env`);
-    process.exit(1);
+    console.error(`   Check: 1) MongoDB Atlas Network Access (allow 0.0.0.0/0)`);
+    console.error(`          2) MONGODB_URI credentials and database name in Render`);
   }
 };
 
