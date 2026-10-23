@@ -1,0 +1,248 @@
+{
+  "info": {
+    "name": "Road Damage Reporting API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",      "value": "http://localhost:5000/api" },
+    { "key": "citizenToken", "value": "" },
+    { "key": "adminToken",   "value": "" },
+    { "key": "complaintId",  "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Test Citizen\",\"email\":\"test@example.com\",\"password\":\"Test@12345\",\"phone\":\"+91-9000000099\"}"
+            }
+          }
+        },
+        {
+          "name": "Login (Citizen)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["if(pm.response.code===200){pm.collectionVariables.set('citizenToken',pm.response.json().data.token);}"]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"citizen@roaddamage.local\",\"password\":\"Citizen@12345\"}"
+            }
+          }
+        },
+        {
+          "name": "Login (Admin)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["if(pm.response.code===200){pm.collectionVariables.set('adminToken',pm.response.json().data.token);}"]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"admin@roaddamage.local\",\"password\":\"Admin@12345\"}"
+            }
+          }
+        },
+        {
+          "name": "Get Me",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{citizenToken}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Complaints (Citizen)",
+      "item": [
+        {
+          "name": "Check Duplicate",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/complaints/check-duplicate",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{citizenToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"latitude\":18.5204,\"longitude\":73.8567,\"damageCategory\":\"POTHOLE\"}"
+            }
+          }
+        },
+        {
+          "name": "Submit Complaint (multipart)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/complaints",
+            "header": [{ "key": "Authorization", "value": "Bearer {{citizenToken}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "damageCategory", "value": "POTHOLE", "type": "text" },
+                { "key": "latitude",       "value": "18.5204", "type": "text" },
+                { "key": "longitude",      "value": "73.8567", "type": "text" },
+                { "key": "description",    "value": "Large pothole near school.", "type": "text" },
+                { "key": "image", "type": "file", "src": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "My Complaints",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/complaints/my?page=1&limit=10", "query": [
+              { "key": "page", "value": "1" }, { "key": "limit", "value": "10" }
+            ]},
+            "header": [{ "key": "Authorization", "value": "Bearer {{citizenToken}}" }]
+          }
+        },
+        {
+          "name": "Nearby Complaints (public)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/complaints/nearby?latitude=18.5204&longitude=73.8567&radius=1000",
+              "query": [
+                { "key": "latitude", "value": "18.5204" },
+                { "key": "longitude", "value": "73.8567" },
+                { "key": "radius", "value": "1000" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Public Map Data",
+          "request": { "method": "GET", "url": "{{baseUrl}}/complaints/map" }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Dashboard",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/dashboard",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }]
+          }
+        },
+        {
+          "name": "Analytics",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/admin/analytics?from=2026-01-01&to=2026-12-31", "query": [
+              { "key": "from", "value": "2026-01-01" }, { "key": "to", "value": "2026-12-31" }
+            ]},
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }]
+          }
+        },
+        {
+          "name": "All Complaints",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/admin/complaints?page=1&limit=10", "query": [
+              { "key": "page", "value": "1" }, { "key": "limit", "value": "10" }
+            ]},
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }]
+          }
+        },
+        {
+          "name": "Update Status",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/admin/complaints/{{complaintId}}/status",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"status\":\"IN_PROGRESS\",\"comment\":\"Team assigned.\"}" }
+          }
+        },
+        {
+          "name": "GIS Map Data",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/map",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }]
+          }
+        },
+        {
+          "name": "Reports",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/reports",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }]
+          }
+        },
+        {
+          "name": "Export CSV",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/reports/export",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }]
+          }
+        },
+        {
+          "name": "Duplicates",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/duplicates",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/notifications",
+            "header": [{ "key": "Authorization", "value": "Bearer {{citizenToken}}" }]
+          }
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/notifications/read-all",
+            "header": [{ "key": "Authorization", "value": "Bearer {{citizenToken}}" }]
+          }
+        }
+      ]
+    }
+  ]
+}
