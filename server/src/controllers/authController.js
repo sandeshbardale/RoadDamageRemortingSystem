@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const { prisma } = require('../config/prisma');
 const { success, error } = require('../utils/apiResponse');
 
 const signToken = (userId, role) => {
@@ -8,30 +9,57 @@ const signToken = (userId, role) => {
   });
 };
 
+const formatUser = (user) => {
+  if (!user) return null;
+  const userObj = { ...user };
+  delete userObj.password;
+  userObj._id = user.id; // backward compatibility with client
+  if (userObj.municipalCorporation) {
+    userObj.municipalCorporation._id = userObj.municipalCorporation.id;
+  }
+  return userObj;
+};
+
 // POST /api/auth/register
 const register = async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
 
-    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (!email || !password || !name) {
+      return error(res, 'Name, email, and password are required.', 400, 'VALIDATION_ERROR');
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
     if (existing) {
       return error(res, 'An account with this email already exists.', 409, 'EMAIL_EXISTS');
     }
 
-    const user = await User.create({ name, email, phone, password, role: 'citizen' });
-    const token = signToken(user._id, user.role);
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email: email.toLowerCase(),
+        phone: phone || null,
+        password: hashedPassword,
+        role: 'citizen',
+      },
+    });
+
+    const token = signToken(user.id, user.role);
+    const formattedUser = formatUser(user);
 
     return success(
       res,
-      { token, user },
+      { token, user: formattedUser },
       'Registration successful. Welcome!',
       201
     );
   } catch (err) {
-    if (err.name === 'ValidationError') {
-      const messages = Object.values(err.errors).map((e) => e.message);
-      return error(res, messages.join('. '), 400, 'VALIDATION_ERROR');
-    }
     console.error('Register error:', err);
     return error(res, 'Registration failed. Please try again.', 500);
   }
@@ -42,7 +70,14 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    if (!email || !password) {
+      return error(res, 'Email and password are required.', 400, 'INVALID_CREDENTIALS');
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
     if (!user) {
       return error(res, 'Invalid email or password.', 401, 'INVALID_CREDENTIALS');
     }
@@ -51,13 +86,13 @@ const login = async (req, res) => {
       return error(res, 'Your account has been deactivated.', 403, 'ACCOUNT_INACTIVE');
     }
 
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return error(res, 'Invalid email or password.', 401, 'INVALID_CREDENTIALS');
     }
 
-    const token = signToken(user._id, user.role);
-    const userObj = user.toJSON();
+    const token = signToken(user.id, user.role);
+    const userObj = formatUser(user);
 
     return success(res, { token, user: userObj }, 'Login successful.');
   } catch (err) {
@@ -69,9 +104,17 @@ const login = async (req, res) => {
 // GET /api/auth/me
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).populate('municipalCorporationId', 'name code city');
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: {
+        municipalCorporation: {
+          select: { id: true, name: true, code: true, city: true },
+        },
+      },
+    });
+
     if (!user) return error(res, 'User not found.', 404);
-    return success(res, { user }, 'User profile retrieved.');
+    return success(res, { user: formatUser(user) }, 'User profile retrieved.');
   } catch (err) {
     console.error('GetMe error:', err);
     return error(res, 'Failed to retrieve profile.', 500);
@@ -80,7 +123,6 @@ const getMe = async (req, res) => {
 
 // POST /api/auth/logout
 const logout = async (req, res) => {
-  // JWT is stateless — client must discard the token
   return success(res, {}, 'Logged out successfully.');
 };
 

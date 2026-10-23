@@ -1,4 +1,4 @@
-const Notification = require('../models/Notification');
+const { prisma } = require('../config/prisma');
 
 const STATUS_MESSAGES = {
   REPORTED: {
@@ -36,12 +36,14 @@ const createStatusNotification = async (userId, complaintId, complaintRefId, sta
     const template = STATUS_MESSAGES[status];
     if (!template) return null;
 
-    const notification = await Notification.create({
-      userId,
-      complaintId: complaintRefId,
-      title: template.title,
-      message: template.message(complaintId),
-      type: template.type,
+    const notification = await prisma.notification.create({
+      data: {
+        userId,
+        complaintId: complaintRefId || null,
+        title: template.title,
+        message: template.message(complaintId),
+        type: template.type,
+      },
     });
 
     return notification;

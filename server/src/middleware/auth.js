@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { prisma } = require('../config/prisma');
 const { error } = require('../utils/apiResponse');
 
 /**
@@ -19,7 +19,10 @@ const protect = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findById(decoded.userId).select('-password');
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+    });
+
     if (!user) {
       return error(res, 'User not found. Token may be invalid.', 401, 'USER_NOT_FOUND');
     }
@@ -28,6 +31,8 @@ const protect = async (req, res, next) => {
       return error(res, 'Your account has been deactivated.', 403, 'ACCOUNT_INACTIVE');
     }
 
+    delete user.password;
+    user._id = user.id; // backward compatibility
     req.user = user;
     next();
   } catch (err) {

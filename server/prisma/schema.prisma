@@ -1,0 +1,114 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                     String                    @id @default(uuid())
+  name                   String
+  email                  String                    @unique
+  phone                  String?
+  password               String
+  role                   String                    @default("citizen") // "citizen" | "admin"
+  isActive               Boolean                   @default(true)
+  municipalCorporationId String?
+  municipalCorporation   MunicipalCorporation?     @relation(fields: [municipalCorporationId], references: [id])
+  complaints             Complaint[]
+  statusChanges          ComplaintStatusHistory[]
+  notifications          Notification[]
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+
+  @@index([email])
+  @@index([role])
+}
+
+model MunicipalCorporation {
+  id          String      @id @default(uuid())
+  name        String
+  code        String      @unique
+  city        String
+  state       String
+  boundary    Json?       // GeoJSON Polygon
+  isDemo      Boolean     @default(true)
+  isActive    Boolean     @default(true)
+  users       User[]
+  complaints  Complaint[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([isActive])
+}
+
+model Complaint {
+  id                     String                    @id @default(uuid())
+  complaintId            String                    @unique // RDR-YYYYMMDD-XXXX
+  citizenId              String
+  citizen                User                      @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+  imageUrl               String?
+  imagePublicId          String?
+  damageCategory         String                    // POTHOLE, CRACK, EDGE_FAILURE, WATERLOGGING, SURFACE_DAMAGE, OTHER
+  customDamageType       String?
+  description            String?                   @default("")
+  latitude               Float
+  longitude              Float
+  address                Json?                     // { formatted, road, area, city, state, postcode }
+  municipalCorporationId String?
+  municipalCorporation   MunicipalCorporation?     @relation(fields: [municipalCorporationId], references: [id])
+  assignmentStatus       String                    @default("UNASSIGNED") // ASSIGNED, UNASSIGNED
+  status                 String                    @default("REPORTED") // REPORTED, RECEIVED, IN_PROGRESS, RESOLVED, CLOSED
+  isDuplicate            Boolean                   @default(false)
+  duplicateOfId          String?
+  duplicateOf            Complaint?                @relation("ComplaintDuplicates", fields: [duplicateOfId], references: [id])
+  duplicates             Complaint[]               @relation("ComplaintDuplicates")
+  duplicateDistance      Float?
+  aiAnalysis             Json?
+  statusHistory          ComplaintStatusHistory[]
+  notifications          Notification[]
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+
+  @@index([citizenId])
+  @@index([status])
+  @@index([damageCategory])
+  @@index([municipalCorporationId])
+  @@index([createdAt])
+  @@index([isDuplicate])
+  @@index([latitude, longitude])
+}
+
+model ComplaintStatusHistory {
+  id             String    @id @default(uuid())
+  complaintId    String
+  complaint      Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  previousStatus String?
+  newStatus      String
+  changedById    String
+  changedBy      User      @relation(fields: [changedById], references: [id])
+  comment        String?   @default("")
+  createdAt      DateTime  @default(now())
+
+  @@index([complaintId, createdAt])
+}
+
+model Notification {
+  id          String     @id @default(uuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  complaintId String?
+  complaint   Complaint? @relation(fields: [complaintId], references: [id], onDelete: SetNull)
+  title       String
+  message     String
+  type        String     @default("GENERAL") // COMPLAINT_RECEIVED, STATUS_UPDATE, COMPLAINT_RESOLVED, COMPLAINT_CLOSED, GENERAL
+  isRead      Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, isRead])
+}

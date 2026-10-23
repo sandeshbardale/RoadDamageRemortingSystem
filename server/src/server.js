@@ -7,8 +7,7 @@ const morgan  = require('morgan');
 const path    = require('path');
 const rateLimit = require('express-rate-limit');
 
-const mongoose = require('mongoose');
-const connectDB = require('./config/db');
+const { prisma, connectDB } = require('./config/prisma');
 const { errorHandler } = require('./middleware/errorHandler');
 const { error } = require('./utils/apiResponse');
 
@@ -19,7 +18,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const municipalRoutes = require('./routes/municipalRoutes');
 
-// ─── Connect to MongoDB ───────────────────────────────────────────────────────
+// ─── Connect to Supabase PostgreSQL ──────────────────────────────────────────
 connectDB();
 
 const app = express();
@@ -109,9 +108,13 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
 // ─── Root route ─────────────────────────────────────────────────────────────
-app.get('/', (req, res) => {
-  const dbStates = ['disconnected', 'connected', 'connecting', 'disconnecting'];
-  const dbStatus = dbStates[mongoose.connection.readyState] || 'unknown';
+app.get('/', async (req, res) => {
+  let dbStatus = 'connected';
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch (e) {
+    dbStatus = 'disconnected';
+  }
 
   res.json({
     success: true,
@@ -123,9 +126,15 @@ app.get('/', (req, res) => {
 });
 
 // ─── Health check ─────────────────────────────────────────────────────────────
-app.get('/api/health', (req, res) => {
-  const dbStates = ['disconnected', 'connected', 'connecting', 'disconnecting'];
-  const dbStatus = dbStates[mongoose.connection.readyState] || 'unknown';
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'connected';
+  let isConnected = true;
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch (e) {
+    dbStatus = 'disconnected';
+    isConnected = false;
+  }
 
   res.json({
     success: true,
@@ -134,23 +143,26 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV,
     database: {
       status: dbStatus,
-      connected: mongoose.connection.readyState === 1,
+      connected: isConnected,
+      provider: 'Supabase PostgreSQL',
     },
   });
 });
 
 // ─── DB Readiness Middleware for API endpoints ───────────────────────────────
-app.use('/api', (req, res, next) => {
+app.use('/api', async (req, res, next) => {
   if (req.path === '/health' || req.method === 'OPTIONS') return next();
-  if (mongoose.connection.readyState !== 1) {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    next();
+  } catch (err) {
     return error(
       res,
-      'Database is not connected. In MongoDB Atlas, go to "Network Access" and add "0.0.0.0/0" (Allow Access from Anywhere). Also verify MONGODB_URI in Render environment.',
+      'Database is not connected. Please verify DATABASE_URL in Render environment settings.',
       503,
       'DATABASE_NOT_READY'
     );
   }
-  next();
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
