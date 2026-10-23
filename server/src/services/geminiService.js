@@ -163,7 +163,13 @@ Choose detectedCategory from exactly these values only:
 
   } catch (err) {
     console.error('Gemini damage analysis error:', err.message);
-    return { available: false, message: `Analysis failed: ${err.message}` };
+    const isInvalidKey = err.message.includes('API_KEY_INVALID') || err.message.includes('API key not valid');
+    return {
+      available: false,
+      message: isInvalidKey
+        ? 'Gemini API key is invalid or not activated in Render environment variables.'
+        : `AI analysis currently unavailable: ${err.message}`,
+    };
   }
 };
 

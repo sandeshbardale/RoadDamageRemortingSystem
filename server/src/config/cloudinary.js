@@ -19,15 +19,23 @@ const isCloudinaryReady = () =>
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
 const saveLocally = (buffer, mimeType) => {
-  if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-  const ext      = mimeType === 'image/png' ? '.png' : mimeType === 'image/webp' ? '.webp' : '.jpg';
-  const filename = `${uuidv4()}${ext}`;
-  const filepath = path.join(UPLOADS_DIR, filename);
-  fs.writeFileSync(filepath, buffer);
-  // Return a server-relative URL — served by Express static middleware
+  // Store as permanent Data URL in database so images never disappear on ephemeral cloud hosts (Render/Vercel)
+  const base64 = buffer.toString('base64');
+  const dataUrl = `data:${mimeType};base64,${base64}`;
+
+  try {
+    if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    const ext      = mimeType === 'image/png' ? '.png' : mimeType === 'image/webp' ? '.webp' : '.jpg';
+    const filename = `${uuidv4()}${ext}`;
+    const filepath = path.join(UPLOADS_DIR, filename);
+    fs.writeFileSync(filepath, buffer);
+  } catch (e) {
+    // Disk write error on read-only/serverless environment - non-fatal
+  }
+
   return {
-    url:      `/uploads/${filename}`,
-    publicId: filename,
+    url:      dataUrl,
+    publicId: 'local-data-image',
     isLocal:  true,
   };
 };

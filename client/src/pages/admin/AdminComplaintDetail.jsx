@@ -44,6 +44,7 @@ export default function AdminComplaintDetail() {
   const [newStatus, setNewStatus] = useState('')
   const [comment,   setComment]   = useState('')
   const [imgZoom,   setImgZoom]   = useState(false)  // full-screen image
+  const [imgFailed, setImgFailed] = useState(false)
 
   const load = async () => {
     try {
@@ -150,29 +151,31 @@ export default function AdminComplaintDetail() {
             <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
               📷 Damage Photo
             </h2>
-            {hasImage ? (
+            {hasImage && !imgFailed ? (
               <div className="relative group cursor-pointer" onClick={() => setImgZoom(true)}>
                 <img
                   src={imageUrl}
                   alt="Road damage"
                   className="w-full rounded-xl object-cover max-h-72 border border-gray-100"
-                  onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}
+                  onError={() => setImgFailed(true)}
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all rounded-xl flex items-center justify-center">
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full p-2">
                     <ZoomIn className="w-5 h-5 text-gray-700" />
                   </div>
                 </div>
-                <div style={{display:'none'}} className="w-full h-48 bg-gray-100 rounded-xl items-center justify-center text-gray-400 text-sm flex-col gap-2">
-                  <span className="text-3xl">📷</span>
-                  <span>Image could not be loaded</span>
-                </div>
               </div>
             ) : (
-              <div className="w-full h-48 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-gray-400">
+              <div className="w-full h-48 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-gray-400 p-4">
                 <span className="text-3xl mb-2">📷</span>
-                <p className="text-sm">No photo attached</p>
-                <p className="text-xs mt-1 text-gray-300">Cloudinary not configured or no image uploaded</p>
+                <p className="text-sm font-medium text-gray-600">
+                  {hasImage ? 'Photo not available' : 'No photo attached'}
+                </p>
+                <p className="text-xs mt-1 text-gray-400 text-center max-w-xs">
+                  {hasImage
+                    ? 'This photo was submitted before permanent database image storage was enabled. Newly uploaded reports will display photos permanently.'
+                    : 'Citizen did not attach a photo.'}
+                </p>
               </div>
             )}
           </div>
